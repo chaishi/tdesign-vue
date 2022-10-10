@@ -28,6 +28,7 @@
       :table-layout="tableLayout ? 'auto' : 'fixed'"
       :pagination="pagination"
       :showHeader="showHeader"
+      :size="size"
       cellEmptyContent="-"
     ></t-table>
   </t-space>
