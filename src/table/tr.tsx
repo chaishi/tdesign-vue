@@ -2,33 +2,28 @@ import {
   defineComponent,
   PropType,
   SetupContext,
-  h,
   ref,
   reactive,
   computed,
   toRefs,
   watch,
 } from '@vue/composition-api';
-import isFunction from 'lodash/isFunction';
 import upperFirst from 'lodash/upperFirst';
-import isString from 'lodash/isString';
 import pick from 'lodash/pick';
 import get from 'lodash/get';
-import { CreateElement } from 'vue';
-import { formatClassNames, formatRowAttributes, formatRowClassNames } from './utils';
-import { getRowFixedStyles, getColumnFixedStyles } from './hooks/useFixed';
+import { formatRowAttributes, formatRowClassNames } from './utils';
+import { getRowFixedStyles } from './hooks/useFixed';
 import { RowAndColFixedPosition } from './interface';
 import useClassName from './hooks/useClassName';
-import TEllipsis from './ellipsis';
 import baseTableProps from './base-table-props';
 import { getCellKey, SkipSpansValue } from './hooks/useRowspanAndColspan';
 import useLazyLoad from '../hooks/useLazyLoad';
-import { PaginationProps } from '../pagination';
 import { VirtualScrollConfig } from '../hooks/useVirtualScrollNew';
 import {
-  BaseTableCellParams, TableRowData, RowspanColspan, TdPrimaryTableProps, TdBaseTableProps,
+  TableRowData, RowspanColspan, TdPrimaryTableProps, TdBaseTableProps,
 } from './type';
 import { AttachNode } from '../common';
+import TD from './td';
 
 export interface RenderTdExtra {
   rowAndColFixedPosition: RowAndColFixedPosition;
@@ -36,10 +31,6 @@ export interface RenderTdExtra {
   dataLength: number;
   cellSpans: RowspanColspan;
   cellEmptyContent: TdBaseTableProps['cellEmptyContent'];
-}
-
-export interface RenderEllipsisCellParams {
-  cellNode: any;
 }
 
 export type TrCommonProps = Pick<TdPrimaryTableProps, TrPropsKeys>;
@@ -90,56 +81,7 @@ export interface TrProps extends TrCommonProps {
 
 export const ROW_LISTENERS = ['click', 'dblclick', 'mouseover', 'mousedown', 'mouseenter', 'mouseleave', 'mouseup'];
 
-export function renderCell(
-  params: BaseTableCellParams<TableRowData>,
-  slots: SetupContext['slots'],
-  extra?: {
-    cellEmptyContent?: TdBaseTableProps['cellEmptyContent'];
-    pagination?: PaginationProps;
-  },
-) {
-  const { col, row, rowIndex } = params;
-  // support serial number column
-  if (col.colKey === 'serial-number') {
-    const {
-      current, pageSize, defaultCurrent, defaultPageSize,
-    } = extra?.pagination || {};
-    const tCurrent = current || defaultCurrent;
-    const tPageSize = pageSize || defaultPageSize;
-    if (tPageSize && tCurrent) {
-      return tPageSize * (tCurrent - 1) + rowIndex + 1;
-    }
-    return rowIndex + 1;
-  }
-  if (isFunction(col.cell)) {
-    return col.cell(h, params);
-  }
-  if (slots[col.colKey]) {
-    return slots[col.colKey](params);
-  }
-  if (isString(col.cell) && slots[col.cell]) {
-    return slots[col.cell](params);
-  }
-  if (isFunction(col.render)) {
-    return col.render(h, { ...params, type: 'cell' });
-  }
-  const r = get(row, col.colKey);
-  // 0 和 false 属于正常可用之，不能使用兜底逻辑 cellEmptyContent
-  if (![undefined, '', null].includes(r)) return r;
-  // cellEmptyContent 作为空数据兜底显示，用户可自定义
-  if (extra?.cellEmptyContent) {
-    return isFunction(extra.cellEmptyContent) ? extra.cellEmptyContent(h, params) : extra.cellEmptyContent;
-  }
-  const hParams = h;
-  Object.assign(hParams, params || {});
-  if (slots.cellEmptyContent) {
-    return slots.cellEmptyContent(hParams);
-  }
-  if (slots['cell-empty-content']) {
-    return slots['cell-empty-content'](hParams);
-  }
-  return r;
-}
+const EMPTY_OBJECT = {};
 
 // 表格行组件
 export default defineComponent({
@@ -234,88 +176,13 @@ export default defineComponent({
     };
   },
 
-  methods: {
-    renderEllipsisCell(
-      h: CreateElement,
-      cellParams: BaseTableCellParams<TableRowData>,
-      params: RenderEllipsisCellParams,
-    ) {
-      const { cellNode } = params;
-      const { col } = cellParams;
-      let content = isFunction(col.ellipsis) ? col.ellipsis(h, cellParams) : undefined;
-      if (typeof col.ellipsis === 'object' && isFunction(col.ellipsis.content)) {
-        content = col.ellipsis.content(h, cellParams);
-      }
-      let tooltipProps = {};
-      if (typeof col.ellipsis === 'object') {
-        tooltipProps = 'props' in col.ellipsis ? col.ellipsis.props : col.ellipsis || undefined;
-      }
-      return (
-        <TEllipsis
-          placement={'top'}
-          attach={this.attach || (this.tableElm ? () => this.tableElm : undefined)}
-          tooltipContent={content && (() => content)}
-          tooltipProps={tooltipProps}
-          overlayClassName={this.ellipsisOverlayClassName}
-          classPrefix={this.classPrefix}
-        >
-          {cellNode}
-        </TEllipsis>
-      );
-    },
-
-    renderTd(h: CreateElement, params: BaseTableCellParams<TableRowData>, extra: RenderTdExtra) {
-      const { col, colIndex, rowIndex } = params;
-      const { cellSpans, dataLength, rowAndColFixedPosition } = extra;
-      const cellNode = renderCell(params, this.$scopedSlots, {
-        cellEmptyContent: extra.cellEmptyContent,
-        pagination: this.pagination,
-      });
-      const tdStyles = getColumnFixedStyles(col, colIndex, rowAndColFixedPosition, this.tableColFixedClasses);
-      const customClasses = formatClassNames(col.className, { ...params, type: 'td' });
-      const classes = [
-        tdStyles.classes,
-        customClasses,
-        {
-          [this.tdEllipsisClass]: col.ellipsis,
-          [this.tableBaseClass.tdLastRow]: rowIndex + cellSpans.rowspan === dataLength,
-          [this.tableBaseClass.tdFirstCol]: colIndex === 0 && this.rowspanAndColspan,
-          [this.tdAlignClasses[col.align]]: col.align && col.align !== 'left',
-          // 标记可拖拽列
-          [this.tableDraggableClasses.handle]: col.colKey === 'drag',
-        },
-      ];
-      const onClick = (e: MouseEvent) => {
-        const p = { ...params, e };
-        if (col.stopPropagation) {
-          e.stopPropagation();
-        }
-        this.onCellClick?.(p);
-        // Vue3 ignore this line
-        this.$emit('cell-click', p);
-      };
-      const normalAttrs = isFunction(col.attrs) ? col.attrs({ ...params, type: 'td' }) : col.attrs;
-      const attrs: { [key: string]: any } = { ...normalAttrs, ...cellSpans };
-      return (
-        <td class={classes} attrs={attrs} style={{ ...tdStyles.style, ...attrs.style }} onClick={onClick}>
-          {col.ellipsis ? this.renderEllipsisCell(h, params, { cellNode }) : cellNode}
-        </td>
-      );
-    },
-  },
-
   render(h) {
     const {
       row, rowIndex, dataLength, rowAndColFixedPosition,
     } = this;
+    const rowUniqueKey = get(row, this.rowKey || 'id');
     const columnVNodeList = this.columns?.map((col, colIndex) => {
       const cellSpans: RowspanColspan = {};
-      const params = {
-        row,
-        col,
-        rowIndex,
-        colIndex,
-      };
       let spanState = null;
       if (this.skipSpansMap.size) {
         const cellKey = getCellKey(row, this.rowKey, col.colKey, colIndex);
@@ -324,15 +191,22 @@ export default defineComponent({
         spanState?.colspan > 1 && (cellSpans.colspan = spanState.colspan);
         if (spanState.skipped) return null;
       }
-      return this.renderTd(h, params, {
-        dataLength,
-        rowAndColFixedPosition,
-        columnLength: this.columns.length,
-        cellSpans,
-        cellEmptyContent: this.cellEmptyContent,
-      });
+      return (
+        <TD
+          key={`${rowUniqueKey}_${col.colKey}`}
+          row={row}
+          col={col}
+          colIndex={colIndex}
+          rowIndex={rowIndex}
+          dataLength={dataLength}
+          cellSpans={JSON.stringify(cellSpans)}
+          rowAndColFixedPosition={rowAndColFixedPosition}
+          cellEmptyContent={this.cellEmptyContent}
+          rowspanAndColspan={this.rowspanAndColspan}
+        />
+      );
     });
-    const attrs = this.trAttributes || {};
+    const attrs = this.trAttributes || EMPTY_OBJECT;
     return (
       <tr
         ref="trRef"

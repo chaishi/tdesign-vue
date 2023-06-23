@@ -5,7 +5,7 @@ import { CreateElement } from 'vue';
 import camelCase from 'lodash/camelCase';
 import get from 'lodash/get';
 import pick from 'lodash/pick';
-import TrElement, { TrProps, ROW_LISTENERS, TABLE_PROPS } from './tr';
+import TR, { TrProps, ROW_LISTENERS, TABLE_PROPS } from './tr';
 import { useConfig } from '../config-provider/useConfig';
 import { useTNodeJSX } from '../hooks/tnode';
 import useClassName from './hooks/useClassName';
@@ -91,6 +91,7 @@ export default defineComponent({
     } = toRefs(props);
     const { t, global } = useConfig('table');
     const { tableFullRowClasses, tableBaseClass } = useClassName();
+
     const { skipSpansMap } = useRowspanAndColspan(data, columns, rowKey, rowspanAndColspan);
 
     const tbodyClasses = computed(() => [tableBaseClass.body]);
@@ -208,12 +209,12 @@ export default defineComponent({
 
       // replace scopedSlots of slots in Vue3
       const trNode = (
-        <TrElement
+        <TR
           scopedSlots={this.$scopedSlots}
           key={get(row, this.rowKey || 'id')}
           on={on}
           props={trProps}
-        ></TrElement>
+        ></TR>
       );
       trNodeList.push(trNode);
 

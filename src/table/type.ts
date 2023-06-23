@@ -300,7 +300,7 @@ export interface BaseTableCol<T extends TableRowData = TableRowData> {
   /**
    * 用于多级表头，泛型 T 指表格数据类型
    */
-  children?: Array<BaseTableCol<T>>;
+  // children?: Array<BaseTableCol<T>>;
   /**
    * 列类名，值类型是 Function 使用返回值作为列类名；值类型不为 Function 时，值用于整列类名（含表头）。泛型 T 指表格数据类型
    */

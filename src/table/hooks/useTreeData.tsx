@@ -15,7 +15,7 @@ import {
   PrimaryTableCellParams,
 } from '../type';
 import useClassName from './useClassName';
-import { renderCell } from '../tr';
+import { renderCell } from '../td';
 import { useConfig } from '../../config-provider/useConfig';
 import { useTNodeDefault } from '../../hooks/tnode';
 import { useGlobalIcon } from '../../hooks/useGlobalIcon';
